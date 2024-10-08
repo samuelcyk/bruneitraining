@@ -84,7 +84,7 @@ scale_colour_Publication <- function(...){
 #| include: false
 
 ##Load data
-fdir<-"../data/Brunei_project/"
+fdir<-"../bruneitraining/data"
 
 labelset_t1 <- read.csv(file.path(fdir,"Labelset-T1.csv"), 
                      header =  TRUE) |> 
