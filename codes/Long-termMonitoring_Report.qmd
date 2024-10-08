@@ -1,0 +1,265 @@
+---
+title: "Long-term Monitoring and Reporting"
+subtitle: "ReefCloud Training - Brunei"
+date: Sys.date()
+author: "Australian Institute of Marine Science"
+crossref:
+  lof-title: "List of Figures"
+format: 
+  PrettyPDF-pdf:
+    fig-pos: "H"
+output-file: "Long-TermMonitoringReport-Brunei"
+output-ext: "pdf"
+mainfont: Arial
+engine: knitr
+execute:
+  eval: true
+---
+
+## Introduction
+
+
+## Methodology
+
+
+
+```{r}
+#| label: PrepareWorkspace
+#| echo: false
+#| include: false
+
+library(caret)
+library(tidyverse)
+library(ggthemes)
+library(gt)
+
+##Plot theme
+theme_Publication <- function(base_size=14, base_family="sans") {
+      library(grid)
+      library(ggthemes)
+      (theme_foundation(base_size=base_size, base_family=base_family)
+       + theme(plot.title = element_text(face = "bold",
+                                         size = rel(0.8), hjust = 0.5),
+               text = element_text(),
+               panel.background = element_rect(colour = NA),
+               plot.background = element_rect(colour = NA),
+               panel.border = element_rect(colour = NA),
+               axis.title = element_text(face = "bold",size = rel(1)),
+               axis.title.y = element_text(angle=90,vjust =2),
+               axis.title.x = element_text(vjust = -0.2),
+               axis.text = element_text(), 
+               axis.line = element_line(colour="black"),
+               axis.ticks = element_line(),
+               panel.grid.major = element_line(colour="#f0f0f0"),
+               panel.grid.minor = element_blank(),
+               legend.key = element_rect(colour = NA),
+               legend.position = "bottom",
+               legend.direction = "horizontal",
+               legend.key.size= unit(0.2, "cm"),
+               legend.margin = unit(0, "cm"),
+               legend.title = element_text(face="italic"),
+               plot.margin=unit(c(10,5,5,5),"mm"),
+               strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
+               strip.text = element_text(face="bold")
+          ))
+      
+}
+
+scale_fill_Publication <- function(...){
+      library(scales)
+      discrete_scale("fill","Publication",manual_pal(values = c("#386cb0","#fdb462","#7fc97f","#ef3b2c","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
+
+}
+
+scale_colour_Publication <- function(...){
+      library(scales)
+      discrete_scale("colour","Publication",manual_pal(values = c("#386cb0","#fdb462","#7fc97f","#ef3b2c","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
+
+}
+```
+
+```{r}
+#| label: LoadData
+#| echo: false
+#| include: false
+
+##Load data
+fdir<-"../data/Brunei_project/"
+
+labelset_t1 <- read.csv(file.path(fdir,"Labelset-T1.csv"), 
+                     header =  TRUE) |> 
+  rename(classification = CODE,
+         label = DESCRIPTION,
+         groupcode = FUNCTIONAL.GROUP) |> 
+  select(classification, label, groupcode)
+
+data_t1_long <- read.csv(file.path(fdir,"Project-T1.csv"), 
+                header = TRUE) |> 
+  select(site_id, 
+       site_latitude, 
+       site_longitude, 
+       site_reef_name,
+       survey_id, 
+       survey_title, 
+       survey_start_date..UTC., 
+       survey_depth, 
+       survey_transect_number,
+       image_id, 
+       image_disabled, 
+       point_id, 
+       point_num, 
+       point_machine_classification, 
+       point_human_classification, 
+       point_human_group_code) |> 
+  mutate(year = year(survey_start_date..UTC.), 
+         month = month(survey_start_date..UTC.), 
+         date = date(survey_start_date..UTC.),
+         transect_id = paste(site_id, 
+                             year(survey_start_date..UTC.), 
+                             survey_transect_number, 
+                             sep = "_")) |> 
+  select(-survey_start_date..UTC.) |> 
+  filter(image_disabled == "False") |> 
+  select(-image_disabled) |> 
+  pivot_longer(cols = matches("point_.*_classification"), 
+               names_to = "type",
+               values_to = "classification") |>
+  left_join(labelset_t1)
+
+data_t1_cover <- data_t1_long |> 
+    group_by(across(c(starts_with("site"),
+                    starts_with("survey"),
+                    type, 
+                    date,
+                    year,
+                    month,
+                    #classification, 
+                    #label, 
+                    groupcode))
+  ) |> 
+  summarise(count = n(), .groups = "keep") |> 
+  ungroup(groupcode) |>
+  mutate(total = sum(count)) |>
+  ungroup() |> 
+  mutate(cover = count/total)
+
+labelset_t3 <- read.csv(file.path(fdir,"Labelset-T3.csv"), 
+                     header =  TRUE) |> 
+  rename(classification = CODE,
+         label = DESCRIPTION,
+         groupcode = FUNCTIONAL.GROUP) |> 
+  select(classification, label, groupcode)
+
+data_t3_long <- read.csv(file.path(fdir,"Project-T3.csv"), 
+                header = TRUE) |> 
+  select(site_id, 
+       site_latitude, 
+       site_longitude, 
+       site_reef_name,
+       survey_id, 
+       survey_title, 
+       survey_start_date..UTC., 
+       survey_depth, 
+       survey_transect_number,
+       image_id, 
+       image_disabled, 
+       point_id, 
+       point_num, 
+       point_machine_classification, 
+       point_human_classification, 
+       point_human_group_code) |> 
+  mutate(year = year(survey_start_date..UTC.), 
+         month = month(survey_start_date..UTC.), 
+         date = date(survey_start_date..UTC.),
+         transect_id = paste(site_id, 
+                             year(survey_start_date..UTC.), 
+                             survey_transect_number, 
+                             sep = "_")) |> 
+  select(-survey_start_date..UTC.) |> 
+  filter(image_disabled == "False") |> 
+  select(-image_disabled) |> 
+  pivot_longer(cols = matches("point_.*_classification"), 
+               names_to = "type",
+               values_to = "classification") |>
+  left_join(labelset_t3)
+
+data_t3_cover <- data_t3_long |> 
+    group_by(across(c(starts_with("site"),
+                    starts_with("survey"),
+                    type, 
+                    date,
+                    year,
+                    month,
+                    #classification, 
+                    #label, 
+                    groupcode))
+  ) |> 
+  summarise(count = n(), .groups = "keep") |> 
+  ungroup(groupcode) |>
+  mutate(total = sum(count)) |>
+  ungroup() |> 
+  mutate(cover = count/total)
+
+data_t3_diversity <- data_t3_long |> 
+    group_by(across(c(starts_with("site"),
+                    starts_with("survey"),
+                    type, 
+                    date,
+                    year,
+                    month,
+                    classification
+                    ))
+  ) |> 
+  summarise(count = n(), .groups = "keep") |> 
+  ungroup(classification) |>
+  mutate(total = sum(count)) |>
+  ungroup() |> 
+  mutate(cover = count/total)
+
+allgroup <- vn_rc_tallygc |>  pull(group_code) |>  unique()
+
+filler.group <- vn_rc_tallygc |> 
+  dplyr::select(project_id,
+                project_name,
+                site_id,
+                site_name,
+                site_latitude,
+                site_longitude,
+                survey_id,
+                survey_title,
+                survey_start_date..UTC.,
+                survey_depth,
+                survey_transect_number, 
+                transect_id,
+                type
+  ) |> 
+  distinct() |> 
+  tidyr::crossing(group_code = allgroup)
+
+vn_rc_tallygc <- vn_rc_tallygc |> 
+  full_join(filler.group) |> 
+  group_by(
+    across(c(starts_with("project"), 
+             starts_with("site"),
+             starts_with("survey"),
+             transect_id,
+             type,
+             group_code
+    ))) |> 
+  mutate(count_groupcode = ifelse(is.na(count_groupcode), 0, count_groupcode))
+
+```
+
+```{r}
+#| label: EDA
+#| echo: false
+#| include: false
+
+ggplot(data_t3 |> 
+         filter(type == "point_machine_classification",
+                groupcode == "HC")) + 
+  geom_point(aes(x = date, y = cover, colour = site_reef_name))
+
+ggplot(data_t3 |> )
+```
+
