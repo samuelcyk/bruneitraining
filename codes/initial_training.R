@@ -7,7 +7,7 @@ data <- read.csv("./data/Brunei_project/Project-T3.csv", header = TRUE) #read da
 head(data) #look at top lines of data
 data #look at the whole data
 names(data) #look at the names of the data
-data$site_name #look at a specific variable
+data$site_id #look at a specific variable
 
 names(data) #shows the names of all columns in data
 data1 <- data |> #pipe to feed data into next function 
