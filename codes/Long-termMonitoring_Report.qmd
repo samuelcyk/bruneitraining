@@ -78,24 +78,21 @@ scale_colour_Publication <- function(...){
 }
 ```
 
+
 ```{r}
-#| label: LoadData
+#| label: LoadDatat3
 #| echo: false
 #| include: false
-
-##Load data
-fdir<-"../bruneitraining/data"
-
-labelset_t1 <- read.csv(file.path(fdir,"Labelset-T1.csv"), 
+labelset_t3 <- read.csv("../data/Brunei_project/Labelset-T3.csv", 
                      header =  TRUE) |> 
   rename(classification = CODE,
          label = DESCRIPTION,
          groupcode = FUNCTIONAL.GROUP) |> 
   select(classification, label, groupcode)
 
-data_t1_long <- read.csv(file.path(fdir,"Project-T1.csv"), 
+data_t3_long <- read.csv("../data/Brunei_project/Project-T3.csv", 
                 header = TRUE) |> 
-  select(site_id, 
+  select(site_id,
        site_latitude, 
        site_longitude, 
        site_reef_name,
@@ -111,64 +108,7 @@ data_t1_long <- read.csv(file.path(fdir,"Project-T1.csv"),
        point_machine_classification, 
        point_human_classification, 
        point_human_group_code) |> 
-  mutate(year = year(survey_start_date..UTC.), 
-         month = month(survey_start_date..UTC.), 
-         date = date(survey_start_date..UTC.),
-         transect_id = paste(site_id, 
-                             year(survey_start_date..UTC.), 
-                             survey_transect_number, 
-                             sep = "_")) |> 
-  select(-survey_start_date..UTC.) |> 
-  filter(image_disabled == "False") |> 
-  select(-image_disabled) |> 
-  pivot_longer(cols = matches("point_.*_classification"), 
-               names_to = "type",
-               values_to = "classification") |>
-  left_join(labelset_t1)
-
-data_t1_cover <- data_t1_long |> 
-    group_by(across(c(starts_with("site"),
-                    starts_with("survey"),
-                    type, 
-                    date,
-                    year,
-                    month,
-                    #classification, 
-                    #label, 
-                    groupcode))
-  ) |> 
-  summarise(count = n(), .groups = "keep") |> 
-  ungroup(groupcode) |>
-  mutate(total = sum(count)) |>
-  ungroup() |> 
-  mutate(cover = count/total)
-
-labelset_t3 <- read.csv(file.path(fdir,"Labelset-T3.csv"), 
-                     header =  TRUE) |> 
-  rename(classification = CODE,
-         label = DESCRIPTION,
-         groupcode = FUNCTIONAL.GROUP) |> 
-  select(classification, label, groupcode)
-
-data_t3_long <- read.csv(file.path(fdir,"Project-T3.csv"), 
-                header = TRUE) |> 
-  select(site_id, 
-       site_latitude, 
-       site_longitude, 
-       site_reef_name,
-       survey_id, 
-       survey_title, 
-       survey_start_date..UTC., 
-       survey_depth, 
-       survey_transect_number,
-       image_id, 
-       image_disabled, 
-       point_id, 
-       point_num, 
-       point_machine_classification, 
-       point_human_classification, 
-       point_human_group_code) |> 
-  mutate(year = year(survey_start_date..UTC.), 
+  mutate(year = year(survey_start_date..UTC.), #create year month date id
          month = month(survey_start_date..UTC.), 
          date = date(survey_start_date..UTC.),
          transect_id = paste(site_id, 
@@ -183,22 +123,99 @@ data_t3_long <- read.csv(file.path(fdir,"Project-T3.csv"),
                values_to = "classification") |>
   left_join(labelset_t3)
 
+data_t3_long <- data_t3_long |> 
+  mutate(site_reef_name = case_when(
+    site_reef_name == "Pelong Rock" ~ "Pelong Rock",
+    site_reef_name == "pelong rock RCB" ~ "Pelong Rock",
+    site_reef_name == "Abana Reef" ~ "Abana Reef",
+    site_reef_name == "Amcotts Rock" ~ "Amcotts Rock",
+    site_reef_name == "Brunei Patches" ~ "Brunei Patches",
+    site_reef_name == "Two Fathom Rock" ~ "Two Fathom Rock"
+  ))
+
+data_t3_long <- data_t3_long |> 
+  mutate(groupcode = case_when(
+    groupcode == "BL_HC" ~ "HC",
+    groupcode == "CA" ~ "CA",
+    groupcode == "CM" ~ "CM",
+    groupcode == "HC" ~ "HC",
+    groupcode == "MA" ~ "MA",
+    groupcode == "MI" ~ "MI",
+    groupcode == "OT" ~ "OT",
+    groupcode == "SC" ~ "SC",
+    groupcode == "SI" ~ "SI",
+    groupcode == "SP" ~ "SP",
+    groupcode == "SS" ~ "SS",
+    groupcode == "TA" ~ "TA",
+    groupcode == "UN" ~ "UN"
+  )) |> 
+  filter(groupcode != "NA")
+
+data_t3_long <- data_t3_long |> 
+  mutate(season = case_when(
+    month >= 4 & month <= 9 ~ "Apr-Sep",
+    month >= 10 | month <= 3 ~ "Oct-Mar"
+  ))
+
+data_t3_long <- data_t3_long |> 
+  mutate(protection = case_when(
+    site_reef_name == "Abana Reef" ~ "Protected",
+    site_reef_name == "Amcotts Rock" ~ "Not Protected",
+    site_reef_name == "Brunei Patches" ~ "Not Protected",
+    site_reef_name == "Pelong Rock" ~ "Protected",
+    site_reef_name == "Two Fathom Rock" ~ "Not Protected"
+  ))
+
+
 data_t3_cover <- data_t3_long |> 
     group_by(across(c(starts_with("site"),
                     starts_with("survey"),
                     type, 
                     date,
                     year,
-                    month,
-                    #classification, 
-                    #label, 
+                    date,
+                    season,
+                    protection,
+                    transect_id,
                     groupcode))
   ) |> 
   summarise(count = n(), .groups = "keep") |> 
   ungroup(groupcode) |>
   mutate(total = sum(count)) |>
-  ungroup() |> 
-  mutate(cover = count/total)
+  ungroup()
+
+allgroup <- data_t3_cover |>  pull(groupcode) |>  unique()
+
+filler.group <- data_t3_cover |> 
+  dplyr::select(c(starts_with("site"),
+                    starts_with("survey"),
+                    type, 
+                    date,
+                    year,
+                    date,
+                    season,
+                    transect_id,
+                    groupcode)
+  ) |> 
+  distinct() |> 
+  tidyr::crossing(group_code = allgroup)
+
+data_t3_cover <- data_t3_cover |> 
+  full_join(filler.group) |> 
+  group_by(
+    across(c(starts_with("site"),
+                    starts_with("survey"),
+                    type, 
+                    date,
+                    year,
+                    date,
+                    season,
+                    protection,
+                    transect_id,
+                    groupcode
+    ))) |> 
+  mutate(count = ifelse(is.na(count), 0, count),
+         cover = count/total*100)
 
 data_t3_diversity <- data_t3_long |> 
     group_by(across(c(starts_with("site"),
@@ -206,60 +223,129 @@ data_t3_diversity <- data_t3_long |>
                     type, 
                     date,
                     year,
-                    month,
-                    classification
+                    date,
+                    season,
+                    protection,
+                    transect_id,
+                    classification,
+                    groupcode
                     ))
   ) |> 
   summarise(count = n(), .groups = "keep") |> 
   ungroup(classification) |>
   mutate(total = sum(count)) |>
-  ungroup() |> 
-  mutate(cover = count/total)
+  ungroup()
 
-allgroup <- vn_rc_tallygc |>  pull(group_code) |>  unique()
+allclass <- data_t3_diversity |>  pull(classification) |>  unique()
 
-filler.group <- vn_rc_tallygc |> 
-  dplyr::select(project_id,
-                project_name,
-                site_id,
-                site_name,
-                site_latitude,
-                site_longitude,
-                survey_id,
-                survey_title,
-                survey_start_date..UTC.,
-                survey_depth,
-                survey_transect_number, 
-                transect_id,
-                type
-  ) |> 
+filler.class <- data_t3_diversity |> 
+  dplyr::select(c(starts_with("site"),
+                    starts_with("survey"),
+                    type, 
+                    date,
+                    year,
+                    date,
+                    season,
+                    transect_id
+  )) |> 
   distinct() |> 
-  tidyr::crossing(group_code = allgroup)
+  tidyr::crossing(classification = allclass)
 
-vn_rc_tallygc <- vn_rc_tallygc |> 
-  full_join(filler.group) |> 
+data_t3_diversity <- data_t3_diversity |> 
+  full_join(filler.class) |> 
   group_by(
-    across(c(starts_with("project"), 
-             starts_with("site"),
-             starts_with("survey"),
-             transect_id,
-             type,
-             group_code
-    ))) |> 
-  mutate(count_groupcode = ifelse(is.na(count_groupcode), 0, count_groupcode))
+    across(c(starts_with("site"),
+                    starts_with("survey"),
+                    type, 
+                    date,
+                    year,
+                    date,
+                    season,
+                    protection,
+                    transect_id    
+             ))) |> 
+  mutate(count = ifelse(is.na(count), 0, count),
+         cover = count/total*100)
+```
 
+
+```{r}
+#| label: coralcovertime
+#| echo: false
+#| include: false
+ggplot(data_t3_cover |>  
+         filter(type == "point_machine_classification",
+                groupcode == "HC")) +
+  geom_point(aes(x = year, y = cover)) +
+  geom_smooth(aes(x = year, y = cover), method = "lm") +
+  facet_wrap(~ site_reef_name) +
+  labs(x = "Time",
+       y = "Hardcoral cover (%)",
+       title = "Hardcoral cover across time") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))
+```
+Hard coral cover changes at the different sites shows different trends through time. In particular, Amcotts Rock show the largest rate of decline.
+
+```{r}
+#| label: macroalgaecovertime
+#| echo: false
+#| include: false
+ggplot(data_t3_cover |>  
+         filter(type == "point_machine_classification",
+                groupcode == "MA")) +
+  geom_point(aes(x = year, y = cover)) +
+  geom_smooth(aes(x = year, y = cover), method = "lm") +
+  facet_wrap(~ site_reef_name) +
+  labs(x = "Time",
+       y = "Macroalgae cover (%)",
+       title = "Macroalgae cover across time") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))
+```
+Macroalgae cover changes at the different sites shows different trends through time. In particular, Abana Reef show the largest rate of decline.
+
+```{r}
+#| label: calculateGenusDiversity
+#| echo: false
+#| include: false
+data_t3_diversitycount <- 
+  data_t3_diversity |>  
+  filter(groupcode == "HC") |> 
+  group_by(across(site_id:transect_id)) |> 
+  summarise(diversity = n())
 ```
 
 ```{r}
-#| label: EDA
+#| label: calculateGenusDiversity
 #| echo: false
 #| include: false
-
-ggplot(data_t3 |> 
-         filter(type == "point_machine_classification",
-                groupcode == "HC")) + 
-  geom_point(aes(x = date, y = cover, colour = site_reef_name))
-
-ggplot(data_t3 |> )
+ggplot(data_t3_diversitycount |> 
+         filter(type == "point_machine_classification")) +
+  geom_boxplot(aes(x = year, y = diversity)) +
+  facet_grid(~ site_reef_name) +
+  labs(x = "Time",
+       y = "No. of Hardcoral Genus",
+       title = "Hardcoral genus at different sites") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))
 ```
+
+Hard coral genus at different sites show different patterns. Abana Reef has the most number of hard coral genera, compared to other sites.
+
+```{r}
+#| label: calculateGenusDiversityProtectedareas
+#| echo: false
+#| include: false
+ggplot(data_t3_diversitycount |> 
+         filter(type == "point_machine_classification")) +
+  geom_boxplot(aes(x = year, y = diversity)) +
+  facet_grid(~ protection) +
+  labs(x = "Time",
+       y = "No. of Hardcoral Genus",
+       title = "Hardcoral genus at different protection zones") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 1, hjust=1))
+```
+
 
